@@ -5,6 +5,7 @@ mod assigns;
 mod backups;
 mod chain_edit;
 mod editing;
+mod pedal;
 mod setlists;
 mod tuner;
 
@@ -841,50 +842,68 @@ impl EditorApp {
             ui.label(format!("Slot {slot} holds unknown FX type {}", s.type_id));
             return;
         };
-        let doc = tables::fx_doc(t.name);
-        ui.horizontal(|ui| {
-            ui.heading(t.name);
-            let (txt, col) = if s.on { ("ON", GREEN) } else { ("OFF", Color32::from_gray(140)) };
-            if ui
-                .add(egui::Button::new(RichText::new(txt).color(col).strong()))
-                .on_hover_text("Turn the effect on/off")
-                .clicked()
-            {
-                self.set_fx_switch(slot, !s.on);
+        let ty_label = t.param("type").and_then(|p| data.fx_param(slot, p).map(|v| p.display(v)));
+        let look = pedal::look(t.name, ty_label.as_deref(), t.color);
+        let mut toggle = false;
+        ui.horizontal_top(|ui| {
+            if let Some(l) = &look {
+                ui.vertical(|ui| {
+                    ui.add_space(4.0);
+                    let value = |p: &FxParamDef| data.fx_param(slot, p);
+                    toggle = pedal::show(ui, l, t, ty_label.as_deref(), s.on, &value);
+                });
+                ui.add_space(12.0);
             }
-            ui.label(RichText::new(format!("slot {slot}")).weak());
-            self.chain_buttons(ui, data, slot);
-        });
-        // What the effect does (and what it models), from the parameter guide.
-        if let Some(d) = doc.filter(|d| !d.text.is_empty()) {
-            ui.add(egui::Label::new(RichText::new(d.text).weak()).wrap());
-        }
-        ui.add_space(4.0);
-        let base = slot_offset(slot);
-        egui::Grid::new(("fx-params", slot)).num_columns(2).striped(true).spacing([16.0, 6.0]).show(ui, |ui| {
-            for p in t.params.iter().filter(|p| matches!(p.field, FxField::Param(_))) {
-                let flash = base.is_some_and(|b| self.flashing(b + p.offset.linear(), p.encoding.size()));
-                let pdoc = doc.and_then(|d| d.param(p.unique_name));
-                let color = if flash { AMBER } else { ui.visuals().text_color() };
-                editing::doc_label(ui, RichText::new(p.name).color(color), pdoc);
-                match data.fx_param(slot, p) {
-                    Some(v) => {
-                        ui.vertical(|ui| {
-                            if let Some(n) = editing::fx_param_widget(ui, slot, p, v, pdoc) {
-                                self.set_fx_param(slot, p, n);
-                            }
-                            if !p.values.is_empty() {
-                                editing::option_note(ui, pdoc, &p.display(v));
-                            }
-                        });
+            ui.vertical(|ui| {
+                let doc = tables::fx_doc(t.name);
+                ui.horizontal(|ui| {
+                    ui.heading(t.name);
+                    let (txt, col) = if s.on { ("ON", GREEN) } else { ("OFF", Color32::from_gray(140)) };
+                    if ui
+                        .add(egui::Button::new(RichText::new(txt).color(col).strong()))
+                        .on_hover_text("Turn the effect on/off")
+                        .clicked()
+                    {
+                        self.set_fx_switch(slot, !s.on);
                     }
-                    None => {
-                        ui.label("—");
-                    }
+                    ui.label(RichText::new(format!("slot {slot}")).weak());
+                    self.chain_buttons(ui, data, slot);
+                });
+                // What the effect does (and what it models), from the parameter guide.
+                if let Some(d) = doc.filter(|d| !d.text.is_empty()) {
+                    ui.add(egui::Label::new(RichText::new(d.text).weak()).wrap());
                 }
-                ui.end_row();
-            }
+                ui.add_space(4.0);
+                let base = slot_offset(slot);
+                egui::Grid::new(("fx-params", slot)).num_columns(2).striped(true).spacing([16.0, 6.0]).show(ui, |ui| {
+                    for p in t.params.iter().filter(|p| matches!(p.field, FxField::Param(_))) {
+                        let flash = base.is_some_and(|b| self.flashing(b + p.offset.linear(), p.encoding.size()));
+                        let pdoc = doc.and_then(|d| d.param(p.unique_name));
+                        let color = if flash { AMBER } else { ui.visuals().text_color() };
+                        editing::doc_label(ui, RichText::new(p.name).color(color), pdoc);
+                        match data.fx_param(slot, p) {
+                            Some(v) => {
+                                ui.vertical(|ui| {
+                                    if let Some(n) = editing::fx_param_widget(ui, slot, p, v, pdoc) {
+                                        self.set_fx_param(slot, p, n);
+                                    }
+                                    if !p.values.is_empty() {
+                                        editing::option_note(ui, pdoc, &p.display(v));
+                                    }
+                                });
+                            }
+                            None => {
+                                ui.label("—");
+                            }
+                        }
+                        ui.end_row();
+                    }
+                });
+            });
         });
+        if toggle {
+            self.set_fx_switch(slot, !s.on);
+        }
     }
 }
 
