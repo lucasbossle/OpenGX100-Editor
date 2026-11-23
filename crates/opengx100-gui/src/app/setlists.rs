@@ -11,7 +11,7 @@ use crate::store::{fmt_time, now, Entry, Setlist, Store};
 use crate::worker::{Cmd, PatchId};
 use eframe::egui::{self, vec2, RichText, Sense, Stroke};
 use opengx100_protocol::librarian::{self, Move};
-use opengx100_protocol::patch::{self, PatchData, USER_PATCHES};
+use opengx100_protocol::patch::{self, user_patches, PatchData};
 use std::time::{Duration, Instant};
 
 /// How long after the last change a setlist is saved.
@@ -425,7 +425,7 @@ impl EditorApp {
         ui.label(RichText::new("Write into").strong());
         ui.horizontal(|ui| {
             ui.label("patches starting at");
-            let max = (USER_PATCHES as usize + 1).saturating_sub(sources.len()).max(1) as u16;
+            let max = (user_patches() as usize + 1).saturating_sub(sources.len()).max(1) as u16;
             let mut start = s.target_start.min(max);
             if ui.add(egui::DragValue::new(&mut start).range(1..=max)).changed() {
                 if let Some(s) = self.active_setlist_mut() {

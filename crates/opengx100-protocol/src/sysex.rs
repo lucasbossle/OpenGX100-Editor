@@ -11,7 +11,8 @@ pub const RQ1: u8 = 0x11;
 /// Default device ID (the pedal reports its actual one in the identity reply).
 pub const DEFAULT_DEVICE_ID: u8 = 0x10;
 pub const MODEL_ID: [u8; 5] = [0x00, 0x00, 0x00, 0x00, 0x0B];
-/// Family code reported in the identity reply.
+/// Family code reported in the identity reply by both the GX-100 and the GX-10 (the installed tables say which
+/// one we're talking to).
 pub const FAMILY_CODE: [u8; 2] = [0x0B, 0x04];
 /// Bytes before the address in a DT1/RQ1: F0 41 dev <model:5> cmd
 const HEADER_LEN: usize = 3 + MODEL_ID.len() + 1;
@@ -62,8 +63,10 @@ pub struct IdentityReply {
 }
 
 impl IdentityReply {
-    pub fn is_gx100(&self) -> bool {
-        self.manufacturer == ROLAND && self.family == FAMILY_CODE
+    /// Whether the reply came from a Roland device with this family code (from the installed tables: the
+    /// GX-100 and the GX-10 share `0B04`).
+    pub fn is_family(&self, family: [u8; 2]) -> bool {
+        self.manufacturer == ROLAND && self.family == family
     }
 }
 
@@ -232,7 +235,7 @@ mod tests {
     fn parse_identity_reply() {
         let m = [0xF0, 0x7E, 0x10, 0x06, 0x02, 0x41, 0x0B, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0xF7];
         let Message::IdentityReply(r) = parse(&m).unwrap() else { panic!() };
-        assert!(r.is_gx100());
+        assert!(r.is_family(FAMILY_CODE));
         assert_eq!(r.device_id, 0x10);
         assert_eq!(r.revision, [0, 1, 0, 0]);
     }

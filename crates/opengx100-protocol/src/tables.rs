@@ -22,6 +22,8 @@ pub struct ProductDef {
     pub device_id: u8,
     pub communication_level: u8,
     pub family_code: [u8; 2],
+    /// The pedal's user patch count: 200 on the GX-100, 198 on the GX-10.
+    pub patches: u16,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -227,11 +229,16 @@ pub struct AssignCategoryDef {
     pub block_name: &'static str,
 }
 
+/// A target the pedal has no use for: it keeps its place in [`ASSIGN_TARGETS`] (so the indices after it stay
+/// right) but is never offered.
+pub const HIDDEN: i16 = -2;
+
 /// What an assign can move. The value of `assign(n).TARGET` indexes [`ASSIGN_TARGETS`].
 #[derive(Debug, Clone, Copy)]
 pub struct AssignTargetDef {
     pub name: &'static str,
-    /// Index in [`ASSIGN_CATEGORIES`]; -1 for ON/OFF, which every effect with a switch shares.
+    /// Index in [`ASSIGN_CATEGORIES`]; -1 for ON/OFF, which every effect with a switch shares; [`HIDDEN`] for a
+    /// target this pedal has no use for (the GX-10's AMP CTL, whose table entry has no category).
     pub category: i16,
     /// A parameter of the FX in slot `TARGET_FX_ITEM`; otherwise of MASTER, TUNER or MIDI.
     pub effect: bool,

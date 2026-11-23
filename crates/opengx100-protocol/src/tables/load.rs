@@ -131,6 +131,7 @@ fn product(j: &Json) -> Res<ProductDef> {
         device_id: u8::from_str_radix(text(j, "deviceId"), 16).map_err(|_| format!("{w}: bad deviceId"))?,
         communication_level: u8::try_from(int(j, "communicationLevel", w)?).map_err(|_| format!("{w}: bad level"))?,
         family_code: hex_bytes(text(j, "familyCode"), "product familyCode")?,
+        patches: u16::try_from(int(j, "patches", w).unwrap_or(200)).unwrap_or(200),
     })
 }
 
@@ -306,7 +307,13 @@ pub fn from_json(bundle: &str, guide: Option<&str>) -> Res<Tables> {
             let name = text(t, "name");
             Ok(AssignTargetDef {
                 name,
-                category: i16::try_from(int(t, "category", name)?).map_err(|e| e.to_string())?,
+                // TARGET is a position in this list, so a target the pedal can't offer (the GX-10's AMP CTL1/2,
+                // category null) keeps its place and is only left out of the lists: dropping it would shift every
+                // later target by one and make the pedal write the wrong one.
+                category: match t.get("category") {
+                    Some(c) if !c.is_null() => i16::try_from(int(t, "category", name)?).map_err(|e| e.to_string())?,
+                    _ => HIDDEN,
+                },
                 effect: t.get("effect").and_then(Json::as_bool).unwrap_or(true),
                 unique_name: text(t, "uniqueName"),
             })

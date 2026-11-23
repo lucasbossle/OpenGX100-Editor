@@ -18,7 +18,7 @@ use editing::Dialog;
 use eframe::egui::{self, pos2, vec2, Color32, Pos2, Rect, RichText, Sense, Stroke};
 use opengx100_protocol::backup::AreaData;
 use opengx100_protocol::chain::Limits;
-use opengx100_protocol::patch::{self, ChainLayout, PatchData, FX_SLOTS, USER_PATCHES};
+use opengx100_protocol::patch::{self, user_patches, ChainLayout, PatchData, FX_SLOTS};
 use opengx100_protocol::tables::{self, FxField, FxParamDef, FxTypeDef};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -199,7 +199,7 @@ impl EditorApp {
             auto_reconnect: false,
             live: false,
             current: None,
-            names: vec![None; USER_PATCHES as usize],
+            names: vec![None; user_patches() as usize],
             patches: HashMap::new(),
             loading: Vec::new(),
             recent: Vec::new(),
@@ -541,7 +541,7 @@ impl EditorApp {
                 let n = self.active_setlist().map(|s| s.entries.len()).unwrap_or(0);
                 ui.label(RichText::new(format!("tick patches to add them to the setlist ({n} in it)")).weak());
             }
-            let rows: Vec<u16> = (1..=USER_PATCHES)
+            let rows: Vec<u16> = (1..=user_patches())
                 .filter(|&n| {
                     filter.is_empty()
                         || self.names[n as usize - 1].as_deref().is_some_and(|s| s.to_lowercase().contains(&filter))

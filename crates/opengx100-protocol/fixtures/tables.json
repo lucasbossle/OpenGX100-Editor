@@ -9,7 +9,8 @@
   "modelId": "000000000B",
   "deviceId": "10",
   "communicationLevel": 3,
-  "familyCode": "0B04"
+  "familyCode": "0B04",
+  "patches": 200
  },
  "commands": {
   "commands": {

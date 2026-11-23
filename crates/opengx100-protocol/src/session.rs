@@ -37,8 +37,8 @@ pub enum Error {
         got: u32,
         want: u32,
     },
-    /// A device answered the identity request, but it is not a GX-100.
-    NotGx100(IdentityReply),
+    /// A device answered the identity request, but it isn't the pedal the tables are for.
+    NotThisPedal(IdentityReply),
     Value(ValueError),
     Unknown(String),
     /// Blocked by a safety rule.
@@ -51,10 +51,13 @@ impl fmt::Display for Error {
             Error::Transport(e) => write!(f, "MIDI error: {e}"),
             Error::Timeout(what) => write!(f, "no answer from the pedal ({what})"),
             Error::Incomplete { addr, got, want } => write!(f, "read at {addr}: got {got} of {want} bytes"),
-            Error::NotGx100(r) => write!(
+            Error::NotThisPedal(r) => write!(
                 f,
-                "the connected device is not a GX-100 (manufacturer {:02X}, family {:02X}{:02X})",
-                r.manufacturer, r.family[0], r.family[1]
+                "the connected device is not a {} (manufacturer {:02X}, family {:02X}{:02X})",
+                tables::PRODUCT.name,
+                r.manufacturer,
+                r.family[0],
+                r.family[1]
             ),
             Error::Value(e) => write!(f, "{e}"),
             Error::Unknown(what) => write!(f, "unknown {what}"),
@@ -197,7 +200,7 @@ impl<T: Transport> Device<T> {
         let mut other = None;
         while let Some(m) = self.answer_before(deadline)? {
             match m {
-                Message::IdentityReply(r) if r.is_gx100() => {
+                Message::IdentityReply(r) if r.is_family(tables::PRODUCT.family_code) => {
                     self.device_id = r.device_id;
                     return Ok(r);
                 }
@@ -205,7 +208,7 @@ impl<T: Transport> Device<T> {
                 m => self.keep_notification(m),
             }
         }
-        Err(other.map(Error::NotGx100).unwrap_or_else(|| Error::Timeout("identity request".into())))
+        Err(other.map(Error::NotThisPedal).unwrap_or_else(|| Error::Timeout("identity request".into())))
     }
 
     /// Reads `size` bytes at `addr`. The pedal may answer with several DT1s.
@@ -277,11 +280,15 @@ impl<T: Transport> Device<T> {
     }
 
     /// Waits until the pedal accepts reads again. It doesn't right after a patch change or a write;
-    /// like the official editor, ask `IS_RQ1_ACCEPT` every 250 ms, for up to 10 s.
+    /// like the official editor, ask `IS_RQ1_ACCEPT` every 250 ms, for up to 10 s. A question that
+    /// goes unanswered means the pedal is still busy, not that it can't be asked: after `PATCH_WRITE`
+    /// the GX-10 stops answering for a while.
     pub fn wait_until_ready(&mut self) -> Result<()> {
         for _ in 0..40 {
-            if self.rq1_accepted()? {
-                return Ok(());
+            match self.rq1_accepted() {
+                Ok(true) => return Ok(()),
+                Ok(false) | Err(Error::Timeout(_)) => {}
+                Err(e) => return Err(e),
             }
             std::thread::sleep(Duration::from_millis(250));
         }
@@ -307,7 +314,7 @@ impl<T: Transport> Device<T> {
     /// then `PATCH_WRITE` with the 0-based patch index as two 7-bit bytes; the pedal confirms with a DT1
     /// at `PATCH_WRITE`, then stays busy for a moment.
     pub fn save_temp_patch(&mut self, n: u16, name: &str) -> Result<()> {
-        if !(1..=crate::patch::USER_PATCHES).contains(&n) {
+        if !(1..=crate::patch::user_patches()).contains(&n) {
             return Err(Error::Refused(format!("there is no user patch {n}")));
         }
         let p = tables::param("Temp_patch.common.Name").ok_or_else(|| Error::Unknown("patch name parameter".into()))?;
@@ -416,7 +423,7 @@ mod tests {
     fn identify_adopts_device_id() {
         let mut d = dev(SimulatedGx100::new().with_device_id(0x11));
         let r = d.identify().unwrap();
-        assert!(r.is_gx100());
+        assert!(r.is_family(crate::sysex::FAMILY_CODE));
         assert_eq!(d.device_id(), 0x11);
         d.read(Address::from_wire([0, 0, 0, 0]), 1).unwrap();
         assert_eq!(d.transport().sent().last().unwrap()[2], 0x11);
@@ -425,7 +432,7 @@ mod tests {
     #[test]
     fn identify_rejects_other_devices() {
         let mut d = dev(SimulatedGx100::new().with_family([0x01, 0x02]));
-        assert!(matches!(d.identify(), Err(Error::NotGx100(_))));
+        assert!(matches!(d.identify(), Err(Error::NotThisPedal(_))));
     }
 
     #[test]

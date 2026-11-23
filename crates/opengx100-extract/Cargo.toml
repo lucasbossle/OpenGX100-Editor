@@ -10,3 +10,5 @@ license.workspace = true
 boa_engine = "0.22.0"
 dirs = "7.0.0"
 opengx100-protocol = { path = "../opengx100-protocol" }
+# Windows keeps BOSS TONE STUDIO's html tree as a zip inside its .exe.
+zip = { version = "9", default-features = false, features = ["deflate"] }

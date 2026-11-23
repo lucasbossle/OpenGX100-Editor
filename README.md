@@ -1,8 +1,8 @@
 # OpenGX100 Editor
 
-An independent, open-source editor for the **BOSS GX-100** guitar effects processor, written in Rust. It talks to the
-pedal over USB MIDI, edits patches live, and adds things the official editor doesn't have: setlists, gear-style
-controls with EQ graphs, and presets for single effect blocks.
+An independent, open-source editor for the **BOSS GX-100** and **GX-10** guitar effects processors, written in Rust.
+It talks to the pedal over USB MIDI, edits patches live, and adds things the official editor doesn't have: setlists,
+gear-style controls with EQ graphs, and presets for single effect blocks.
 
 > **Not affiliated with Roland or BOSS.** "BOSS", "GX-100" and "BOSS TONE STUDIO" are trademarks of Roland
 > Corporation. Neither this repository nor the app contains **any code, data or text from Roland**: at first launch
@@ -34,12 +34,28 @@ OpenGX100 Editor does what BOSS TONE STUDIO does, and adds:
 
 ## Status
 
-Early but usable. **macOS only for now**: tested on macOS with a GX-100 and BOSS TONE STUDIO 2.0.1. Windows and Linux
-should work in principle (the MIDI layer is `midir`, the GUI `egui`), but the code that finds BOSS TONE STUDIO only knows
-the Mac app, and nobody has tried them yet: contributions welcome.
+Early but usable. Tested on macOS with a GX-100 (BOSS TONE STUDIO 2.0.1) and on Windows with a GX-10 (BOSS TONE STUDIO
+1.0.2). The two pedals share their model ID, family code and address map — the GX-10 reports 198 user patches instead of
+200 and has no AMP CTL jacks — so one build serves both; which one you have comes from the installed BOSS TONE STUDIO's
+tables. Linux should work in principle (the MIDI layer is `midir`, the GUI `egui`), but nobody has tried it yet:
+contributions welcome.
 
 Reading is safe. Writes follow exactly what the official editor sends, and every kind of write has been verified on a
 real pedal with writes that change nothing (`opengx100 write-check`). Still, **make a backup first** (Backups tab).
+
+## Install (Windows)
+
+1. Install **BOSS TONE STUDIO for GX-10** or **for GX-100** (free, from [boss.info](https://www.boss.info/), on the
+   pedal's support page) and the BOSS USB driver. OpenGX100 Editor reads the parameter tables from it; you don't need to
+   run it.
+2. Build it (there is no Windows release yet): install [Rust](https://rustup.rs) and a linker for the GNU toolchain
+   (for example `winget install BrechtSanders.WinLibs.POSIX.UCRT`), then `cargo build --release -p opengx100-gui`.
+   The program is `target\release\opengx100-editor.exe`.
+3. On first launch it finds BOSS TONE STUDIO in `C:\Program Files (x86)\BOSS\…`, unpacks its `html` folder out of the
+   `.exe` (Windows keeps it as a zip inside) into `%APPDATA%\OpenGX100 Editor\bts\`, and reads the tables from there. A
+   BOSS TONE STUDIO update is picked up automatically.
+4. Quit BOSS TONE STUDIO while using OpenGX100 Editor: only one editor can talk to the pedal. MIDI ports show up as
+   `GX-10` / `GX-100`; pass `--port <part of the name>` to the CLI if yours differs.
 
 ## Install (macOS)
 

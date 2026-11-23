@@ -25,11 +25,22 @@ pub fn port_names() -> Result<(Vec<String>, Vec<String>), String> {
     Ok((ins, outs))
 }
 
-/// Picks the port whose name contains `filter` (default "GX-100"),
+/// The pedal the installed tables describe (GX-100, GX-10, …), whose name the ports carry.
+fn default_filter() -> &'static str {
+    opengx100_protocol::tables::PRODUCT.name
+}
+
+/// Whether `name` carries `want` as a whole word: "GX-10" must not match a "GX-100" port.
+fn mentions(name: &str, want: &str) -> bool {
+    let n = name.to_lowercase();
+    n.match_indices(want).any(|(i, _)| !n[i + want.len()..].chars().next().is_some_and(|c| c.is_alphanumeric()))
+}
+
+/// Picks the port whose name contains `filter` (default: the pedal's name),
 /// preferring one that isn't a DAW-control port.
 fn pick(names: &[String], filter: Option<&str>) -> Option<usize> {
-    let want = filter.unwrap_or("GX-100").to_lowercase();
-    let hits: Vec<usize> = (0..names.len()).filter(|&i| names[i].to_lowercase().contains(&want)).collect();
+    let want = filter.unwrap_or(default_filter()).to_lowercase();
+    let hits: Vec<usize> = (0..names.len()).filter(|&i| mentions(&names[i], &want)).collect();
     hits.iter()
         .copied()
         .find(|&i| {
@@ -41,10 +52,12 @@ fn pick(names: &[String], filter: Option<&str>) -> Option<usize> {
 
 fn not_found(kind: &str, filter: Option<&str>, names: &[String]) -> String {
     format!(
-        "no MIDI {kind} port matching {:?}. Available: {}. Is the GX-100 connected by USB and its driver installed? \
-         Use --port <part of the name> to choose one.",
-        filter.unwrap_or("GX-100"),
-        if names.is_empty() { "none".to_string() } else { names.join(", ") }
+        "no MIDI {kind} port matching {:?}. Available: {}. Is the {} connected by USB and its driver installed? \
+         Use --port <part of the name> to choose one. Which pedal this is comes from the installed BOSS TONE STUDIO, \
+         so with both installed, point --bts at the right one.",
+        filter.unwrap_or(default_filter()),
+        if names.is_empty() { "none".to_string() } else { names.join(", ") },
+        default_filter()
     )
 }
 
@@ -120,5 +133,35 @@ impl Transport for MidiTransport {
             Err(RecvTimeoutError::Timeout) => Ok(None),
             Err(RecvTimeoutError::Disconnected) => Err("MIDI input closed".into()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ports(names: &[&str]) -> Vec<String> {
+        names.iter().map(|n| n.to_string()).collect()
+    }
+
+    /// The GX-10's port filter must not settle on a GX-100: the pedals can both be connected, and the
+    /// names differ by one digit.
+    #[test]
+    fn the_filter_is_a_whole_word() {
+        let both = ports(&["GX-100", "GX-10"]);
+        assert_eq!(pick(&both, Some("GX-10")).map(|i| both[i].as_str()), Some("GX-10"));
+        assert_eq!(pick(&both, Some("GX-100")).map(|i| both[i].as_str()), Some("GX-100"));
+
+        let only_100 = ports(&["GX-100 1"]);
+        assert_eq!(pick(&only_100, Some("GX-10")), None);
+
+        let with_suffix = ports(&["GX-10 MIDI 1"]);
+        assert_eq!(pick(&with_suffix, Some("GX-10")), Some(0));
+    }
+
+    #[test]
+    fn a_daw_port_loses_to_the_pedal() {
+        let names = ports(&["GX-100 DAW CTRL", "GX-100"]);
+        assert_eq!(pick(&names, Some("GX-100")), Some(1));
     }
 }

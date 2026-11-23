@@ -14,7 +14,7 @@
 use crate::store::{self, Area, Backup};
 use opengx100_protocol::backup::{system_areas, AreaData};
 use opengx100_protocol::chain::{self, Edit, Limits};
-use opengx100_protocol::patch::{self, PatchData, USER_PATCHES};
+use opengx100_protocol::patch::{self, user_patches, PatchData};
 use opengx100_protocol::session::{Device, Notification, ParamValue, Transport};
 use opengx100_protocol::sim::SimulatedGx100;
 use opengx100_protocol::tables;
@@ -168,7 +168,9 @@ struct BackupJob {
 }
 
 impl BackupJob {
-    const TOTAL: usize = 1 + USER_PATCHES as usize;
+    fn total() -> usize {
+        1 + user_patches() as usize
+    }
 
     fn done(&self) -> usize {
         self.system.is_some() as usize + self.patches.len()
@@ -188,8 +190,8 @@ impl BackupJob {
             send(Event::Patch(PatchId::User(n), data.clone()));
             self.patches.push((n, data.name(), data));
         }
-        send(Event::BackupProgress { done: self.done(), total: Self::TOTAL });
-        if self.done() < Self::TOTAL {
+        send(Event::BackupProgress { done: self.done(), total: Self::total() });
+        if self.done() < Self::total() {
             return Ok(None);
         }
         Ok(Some(Backup {
@@ -290,7 +292,7 @@ pub fn run(rx: Receiver<Cmd>, wake: Sender<Cmd>, tx: Sender<Event>, notify: impl
                             Ok(areas) => send(Event::System(areas)),
                             Err(e) => send(Event::Error(format!("reading system settings: {e}"))),
                         }
-                        names.extend(1..=USER_PATCHES);
+                        names.extend(1..=user_patches());
                         dev = Some(d);
                     }
                     Err(e) => send(Event::Error(e)),
@@ -298,7 +300,7 @@ pub fn run(rx: Receiver<Cmd>, wake: Sender<Cmd>, tx: Sender<Event>, notify: impl
             }
             Some(Cmd::LoadNames) => {
                 names.clear();
-                names.extend(1..=USER_PATCHES);
+                names.extend(1..=user_patches());
             }
             Some(Cmd::LoadPatch(id)) => {
                 let Some(d) = dev.as_mut() else {
@@ -316,7 +318,7 @@ pub fn run(rx: Receiver<Cmd>, wake: Sender<Cmd>, tx: Sender<Event>, notify: impl
                     send(Event::Error("not connected".into()));
                 } else if backup.is_none() {
                     backup = Some(BackupJob { system: None, patches: Vec::new() });
-                    send(Event::BackupProgress { done: 0, total: BackupJob::TOTAL });
+                    send(Event::BackupProgress { done: 0, total: BackupJob::total() });
                 }
             }
             Some(Cmd::CancelBackup) => {
@@ -511,14 +513,14 @@ type Ports = Option<(String, String)>;
 
 fn connect(sim: bool, wake: Sender<Cmd>, woken: Arc<AtomicBool>) -> Result<(Dev, String, Ports), String> {
     let (transport, desc, ports): (Box<dyn Transport>, String, Ports) = if sim {
-        (Box::new(demo_sim()), "simulated GX-100".into(), None)
+        (Box::new(demo_sim()), format!("simulated {}", tables::PRODUCT.name), None)
     } else {
         let t = opengx100_midi::open_with_waker(None, move || {
             if !woken.swap(true, Ordering::SeqCst) {
                 let _ = wake.send(Cmd::MidiArrived);
             }
         })?;
-        let desc = format!("GX-100 on {}", t.in_name);
+        let desc = format!("{} on {}", tables::PRODUCT.name, t.in_name);
         let ports = Some((t.in_name.clone(), t.out_name.clone()));
         (Box::new(t), desc, ports)
     };
@@ -656,7 +658,7 @@ fn current_patch_from(n: &Notification) -> Option<u16> {
 
 /// `System_common.CurrentPatchNum` is 0-based; user patch numbers are 1-based.
 fn user_patch_number(raw: i32) -> Option<u16> {
-    (0..USER_PATCHES as i32).contains(&raw).then(|| raw as u16 + 1)
+    (0..user_patches() as i32).contains(&raw).then(|| raw as u16 + 1)
 }
 
 fn current_patch(dev: &mut Dev) -> Option<u16> {
@@ -719,7 +721,7 @@ fn demo_sim() -> SimulatedGx100 {
     if let Some(o) = prev.and_then(|p| at(&format!("Temp_patch.efct.ChainNextItem{}", p - 1))) {
         bytes[o] = 0;
     }
-    for n in 1..=USER_PATCHES {
+    for n in 1..=user_patches() {
         let Some(addr) = patch::user_patch(n) else { continue };
         if let Some(o) = at("Temp_patch.common.Name") {
             bytes[o..o + 16].copy_from_slice(format!("DEMO {n:<11}").as_bytes());
@@ -759,12 +761,12 @@ mod tests {
         let events = RefCell::new(0usize);
         let mut job = BackupJob { system: None, patches: Vec::new() };
         let mut result = None;
-        for _ in 0..BackupJob::TOTAL {
+        for _ in 0..BackupJob::total() {
             assert!(result.is_none(), "finished early");
             result = job.step(&mut d, &|_| *events.borrow_mut() += 1).unwrap();
         }
         let b = result.expect("finished after the last step");
-        assert_eq!(b.patches.len(), USER_PATCHES as usize);
+        assert_eq!(b.patches.len(), user_patches() as usize);
         assert_eq!(b.patches[41].0, 42);
         assert_eq!(b.patches[41].1, "DEMO 42");
         assert!(!b.system.is_empty());

@@ -2,7 +2,7 @@
 //! (macOS: `~/Library/Application Support/OpenGX100 Editor`). Patch data is stored as hex.
 //!
 //! Backups made by BOSS TONE STUDIO (`.alb` files from its "backup all") are read too: same data
-//! (system areas + 200 patches), stored per block as arrays of hex strings.
+//! (system areas + the user patches), stored per block as arrays of hex strings.
 //!
 //! Every write goes to a temporary file first and is then renamed over the old one,
 //! so a crash mid-save never leaves a half-written setlist or backup.
@@ -195,8 +195,8 @@ fn alb_bytes(what: &str, hex: &[String]) -> io::Result<Vec<u8>> {
 /// Converts a BOSS TONE STUDIO backup. Strict: an unknown area or block, a missing block or a size that
 /// doesn't fit is an error, so nothing is ever misplaced.
 fn backup_from_alb(f: AlbFile, created: i64) -> io::Result<Backup> {
-    if f.device != "GX-100" {
-        return Err(invalid(format!("this backup is for a {}, not a GX-100", f.device)));
+    if f.device != tables::PRODUCT.name {
+        return Err(invalid(format!("this backup is for a {}, not a {}", f.device, tables::PRODUCT.name)));
     }
     if let Some(unknown) = f.system.keys().find(|k| !SYSTEM_AREAS.contains(&k.as_str())) {
         return Err(invalid(format!("unknown system area {unknown:?}")));
@@ -740,7 +740,7 @@ mod tests {
                 serde_json::Value::Object(m)
             })
             .collect();
-        serde_json::json!({ "system": system, "userPatch": patches, "formatRev": "0000", "device": "GX-100" })
+        serde_json::json!({ "system": system, "userPatch": patches, "formatRev": "0000", "device": tables::PRODUCT.name })
     }
 
     #[test]

@@ -21,12 +21,15 @@ function extractTables(host) {
   // ------------------------------------------------------- product settings
   const ps = js('config/product_setting.js');
   const pick = (key) => { const m = ps.match(new RegExp(`\\b${key}:\\s*'?([^',\\s]+)'?`)); return m && m[1]; };
+  // The librarian's patch count: 200 on the GX-100, 198 on the GX-10 (the last user banks differ).
+  const lib = js('config/librarian_setting.js');
+  const patches = +(lib.match(/\bthis\.rows\s*=\s*(\d+)/) || [, 200])[1];
   const product = {
     name: pick('name'), btsVersion: pick('version'), btsBuild: pick('build'),
     modelId: pick('modelId'), deviceId: pick('deviceId'),
     lengthOfAddr: +pick('lengthOfAddr'), lengthOfSize: +pick('lengthOfSize'),
     communicationLevel: +pick('communicationLevel'), familyCode: pick('familyCode'),
-    rq1TimeoutSec: +pick('timeout'), extension: pick('extension'),
+    rq1TimeoutSec: +pick('timeout'), extension: pick('extension'), patches,
   };
   ctx.ProductSetting = { ...product, communicationLevel: product.communicationLevel };
 
@@ -102,9 +105,10 @@ function extractTables(host) {
   }));
 
   // ------------------------------------------------- parameter value labels
-  // The editor's UI definition (bg777 = GX-100) binds widgets to parameters ("System_control%29") and to a
-  // resource list for their labels. Only lists that exactly cover a parameter's range are kept.
-  const elf = JSON.parse(read('bg777-pc.elf'));
+  // The editor's UI definition (bg777 = GX-100, bg846 = GX-10; the host passes the one it found) binds widgets to
+  // parameters ("System_control%29") and to a resource list for their labels. Only lists that exactly cover a
+  // parameter's range are kept.
+  const elf = JSON.parse(read(host.elf));
   const lin7 = (hex) => hex.split(' ').reduce((a, x) => a * 128 + parseInt(x, 16), 0);
   const pathAt = new Map(flat.map((f) => [lin7(f.addr), f]));
   const paramValues = new Map();

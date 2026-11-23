@@ -123,6 +123,10 @@ impl PartialEq for Target {
 pub fn target(data: &PatchData, n: u8) -> Option<Target> {
     let value = get(data, n, "TARGET")?;
     let Some(def) = target_def(value) else { return Some(Target::Unknown(value)) };
+    // A target this pedal can't offer (the GX-10's AMP CTL): show it as it is rather than guess.
+    if def.category == tables::HIDDEN {
+        return Some(Target::Unknown(value));
+    }
     if def.effect {
         let slot = get(data, n, "TARGET_FX_ITEM")? as u8 + 1;
         return Some(Target::Fx { slot, fx: data.fx_slot(slot).and_then(|s| s.fx_type()), def });

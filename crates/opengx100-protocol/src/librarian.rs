@@ -8,7 +8,7 @@
 //! extra waits. Blocks longer than [`MAX_DT1_DATA`] bytes are split, as for every other write.
 
 use crate::address::Address;
-use crate::patch::{patch_blocks, user_patch, PatchData, USER_PATCHES};
+use crate::patch::{patch_blocks, user_patch, user_patches, PatchData};
 use crate::session::MAX_DT1_DATA;
 use crate::sysex;
 use std::fmt;
@@ -28,7 +28,7 @@ pub enum PlanError {
         start: u16,
         count: usize,
     },
-    /// A patch number outside 1..=200.
+    /// A patch number outside 1..=the pedal's user patches.
     NoSuchPatch(u16),
 }
 
@@ -38,8 +38,9 @@ impl fmt::Display for PlanError {
             PlanError::Empty => write!(f, "no patches selected"),
             PlanError::PastEnd { start, count } => write!(
                 f,
-                "{count} patches starting at {start} would end at {}, past the last patch ({USER_PATCHES})",
-                *start as usize + count - 1
+                "{count} patches starting at {start} would end at {}, past the last patch ({})",
+                *start as usize + count - 1,
+                user_patches()
             ),
             PlanError::NoSuchPatch(n) => write!(f, "there is no user patch {n}"),
         }
@@ -53,10 +54,10 @@ pub fn plan_moves(order: &[u16], start: u16) -> Result<Vec<Move>, PlanError> {
     if order.is_empty() {
         return Err(PlanError::Empty);
     }
-    if let Some(&bad) = order.iter().chain([&start]).find(|&&n| !(1..=USER_PATCHES).contains(&n)) {
+    if let Some(&bad) = order.iter().chain([&start]).find(|&&n| !(1..=user_patches()).contains(&n)) {
         return Err(PlanError::NoSuchPatch(bad));
     }
-    if start as usize + order.len() - 1 > USER_PATCHES as usize {
+    if start as usize + order.len() - 1 > user_patches() as usize {
         return Err(PlanError::PastEnd { start, count: order.len() });
     }
     Ok(order.iter().enumerate().map(|(i, &source)| Move { target: start + i as u16, source }).collect())

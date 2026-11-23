@@ -10,7 +10,7 @@ use super::{Conn, CtlExpPage, EditorApp, AMBER, RED};
 use crate::worker::{Cmd, PatchId};
 use eframe::egui::{self, RichText};
 use opengx100_protocol::chain::Edit;
-use opengx100_protocol::patch::{self, PatchData, USER_PATCHES};
+use opengx100_protocol::patch::{self, user_patches, PatchData};
 use opengx100_protocol::session::ParamValue;
 use opengx100_protocol::tables::{self, FxParamDef, ParamDef, ParamDoc};
 
@@ -726,7 +726,7 @@ impl EditorApp {
                         ui.add(egui::TextEdit::singleline(name).char_limit(16).desired_width(180.0));
                         ui.end_row();
                         ui.label("Into patch");
-                        ui.add(egui::DragValue::new(target).range(1..=USER_PATCHES));
+                        ui.add(egui::DragValue::new(target).range(1..=user_patches()));
                         ui.end_row();
                     });
                     let there = self.names.get(*target as usize - 1).cloned().flatten().unwrap_or_default();

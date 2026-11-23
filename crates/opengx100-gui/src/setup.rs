@@ -1,4 +1,4 @@
-//! First launch: the parameter tables come from the user's own BOSS TONE STUDIO for GX-100. They're
+//! First launch: the parameter tables come from the user's own BOSS TONE STUDIO. They're
 //! read once (a second or two) and cached; until then this screen stands in for the editor.
 
 use eframe::egui::{self, RichText};
@@ -56,23 +56,23 @@ impl Setup {
                 match &self.problem {
                     None => {
                         ui.spinner();
-                        ui.label("Reading the parameter tables from BOSS TONE STUDIO for GX-100…");
+                        ui.label("Reading the parameter tables from BOSS TONE STUDIO…");
                         ui.label(RichText::new("Only the first time: they're kept for next time.").weak());
                     }
                     Some(problem) => {
                         if *problem == Error::AppNotFound {
-                            ui.label(RichText::new("BOSS TONE STUDIO for GX-100 is needed").strong());
+                            ui.label(RichText::new("BOSS TONE STUDIO is needed").strong());
                             ui.add_space(6.0);
                             ui.label(
                                 "OpenGX100 Editor reads the pedal's parameter tables (names, ranges, effect lists) from \
-                                 Roland's free official editor, installed on this Mac. It doesn't change it or send \
+                                 Roland's free official editor, installed on this computer. It doesn't change it or send \
                                  anything anywhere.",
                             );
                             ui.add_space(4.0);
                             ui.horizontal(|ui| {
                                 ui.label("Get it from");
                                 ui.hyperlink_to("boss.info", BOSS_SUPPORT);
-                                ui.label("(the GX-100's support page), install it, then try again.");
+                                ui.label("(your pedal's support page), install it, then try again.");
                             });
                         } else {
                             ui.label(RichText::new("Couldn't read the parameter tables").strong());
@@ -86,9 +86,8 @@ impl Setup {
                             }
                             if ui.button("Locate BOSS TONE STUDIO…").clicked() {
                                 let picked = rfd::FileDialog::new()
-                                    .set_title("Where is BOSS TONE STUDIO for GX-100?")
-                                    .set_directory("/Applications")
-                                    .add_filter("Application", &["app"])
+                                    .set_title("Where is BOSS TONE STUDIO?")
+                                    .add_filter("BOSS TONE STUDIO", &["app", "exe"])
                                     .pick_file();
                                 if let Some(p) = picked {
                                     retry = Some(Some(p));

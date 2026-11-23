@@ -7,15 +7,23 @@ use crate::tables::{self, FxParamDef, FxTypeDef, ParamDef};
 use std::sync::OnceLock;
 
 pub const FX_SLOTS: u8 = 20;
-pub const USER_PATCHES: u16 = 200;
+
+/// The pedal's user patch count: from the tables (200 on the GX-100, 198 on the GX-10).
+pub fn user_patches() -> u16 {
+    tables::PRODUCT.patches
+}
 
 /// The live patch being played/edited.
 pub fn temp_patch() -> Address {
     tables::root("Temp_patch").map(|r| r.addr).unwrap_or(Address::from_wire([0x10, 0, 0, 0]))
 }
 
-/// Stored user patch `n` (1-based).
+/// Stored user patch `n` (1-based): only patches the pedal actually has (the GX-10 has 198, though its tables
+/// describe 200 addresses, the last two unused).
 pub fn user_patch(n: u16) -> Option<Address> {
+    if !(1..=user_patches()).contains(&n) {
+        return None;
+    }
     tables::root(&format!("User_patch({n})")).map(|r| r.addr)
 }
 
@@ -235,7 +243,7 @@ impl<T: Transport> Device<T> {
     /// (`patch_controller.js` `updateCurrentPatch`): `CurrentPatchNum` gets the 0-based index.
     /// The pedal loads it into the Temp patch; this returns once it accepts reads again.
     pub fn select_patch(&mut self, n: u16) -> Result<()> {
-        if !(1..=USER_PATCHES).contains(&n) {
+        if !(1..=user_patches()).contains(&n) {
             return Err(Error::Refused(format!("there is no user patch {n}")));
         }
         let p = tables::param("System_common.CurrentPatchNum")
