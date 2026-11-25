@@ -41,7 +41,7 @@ Open items, in order:
    optionally save backups as `.alb` so BTS can restore them; HARMONIST "canShift" target names (BTS renames some
    harmonist targets by key); KNOB SETTINGS (not traced yet).
 4. Release follow-ups: descriptions in the release (in-app download of the parameter guide: needs an HTTP client and
-   running manual.mjs's parsing in boa); app icon; CI (GitHub Actions: fmt, clippy, tests on the fixture); Windows/
+   running manual.mjs's parsing in boa); app icon; Windows/
    Linux (find BTS there; bundle); Developer ID signing/notarization if the owner gets one.
 
 ## How we got here
@@ -147,6 +147,8 @@ sandbox, writes `extracted/*.json` incl. `tables.json`) and `opengx100-extract` 
 - `crates/opengx100-extract` — boa + dirs: `find_app`, `app_version`, `extract` (core.js in boa), `prepare` (env → cache
   → extract), `cache_dir`. Used by CLI and GUI.
 - `tools/macos/bundle.sh` — universal .app + zip in `dist/` (gitignored)
+- `.github/workflows/ci.yml` — CI on macOS: fmt, clippy, tests (fixture), release build, all with `-D warnings`;
+  its `checks` job is a required status check in the "Protect master" ruleset (2026-11-25)
 
 ## The GUI today (what each tab does)
 - **Patch** (live editor): always shows the patch active on the pedal ("005 BARCHETTA · active on the pedal"),
