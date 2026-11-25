@@ -149,6 +149,9 @@ sandbox, writes `extracted/*.json` incl. `tables.json`) and `opengx100-extract` 
 - `tools/macos/bundle.sh` — universal .app + zip in `dist/` (gitignored)
 - `.github/workflows/ci.yml` — CI on macOS: fmt, clippy, tests (fixture), release build, all with `-D warnings`;
   its `checks` job is a required status check in the "Protect master" ruleset (2026-11-25)
+- `.github/workflows/release.yml` — on a pushed `v*.*.*` tag: checks the tag equals every crate's `version` and is on
+  master, reruns ci.yml, runs `bundle.sh` on macOS, publishes the release (title "OpenGX100 Editor X.Y.Z for macOS",
+  zip attached, notes = `.github/release-notes.md` with the tag's message as the "what's new" part)
 
 ## The GUI today (what each tab does)
 - **Patch** (live editor): always shows the patch active on the pedal ("005 BARCHETTA · active on the pedal"),
@@ -282,6 +285,8 @@ node tools/extract/manual.mjs         # fetch the parameter guide → extracted/
 cargo test                            # fixture; OPENGX100_TABLES=$PWD/extracted/tables.json cargo test --workspace = real
 cargo test --release -p opengx100-extract -- --ignored   # boa extraction == Node output
 ./tools/macos/bundle.sh               # release build: dist/OpenGX100 Editor.app + zip
+# release: bump version in all 5 crates/*/Cargo.toml (+ Cargo.lock), merge to master, then from master:
+git tag -a v0.5.0 --cleanup=verbatim -F changes.md && git push origin v0.5.0   # CI builds and publishes it
 cargo clippy --workspace --all-targets
 cargo run -p opengx100-gui                # the editor (binary opengx100-editor) (add `-- --sim` for the simulator)
 cargo run -p opengx100-cli -- hello       # real pedal, read-only

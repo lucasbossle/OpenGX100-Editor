@@ -1,0 +1,99 @@
+# Publishes a GitHub release when a version tag (v1.2.3) is pushed:
+#   git tag -a v0.5.0 --cleanup=verbatim -F changes.md && git push origin v0.5.0
+# (--cleanup=verbatim keeps Markdown headings: by default git drops lines starting with #.)
+# The tag must point at a commit on master, and match `version` in every crate's Cargo.toml.
+# The tag's message becomes the "what's new" part of the notes (.github/release-notes.md around it).
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # master's history, to check the tag is on it
+      - id: version
+        name: Tag matches Cargo.toml and is on master
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          bad=0
+          for f in crates/*/Cargo.toml; do
+            v=$(sed -n 's/^version = "\(.*\)"/\1/p' "$f" | head -1)
+            if [ "$v" != "$version" ]; then
+              echo "::error file=$f::version is $v, but the tag is $tag"
+              bad=1
+            fi
+          done
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/master; then
+            echo "::error::$tag points at $GITHUB_SHA, which isn't on master"
+            bad=1
+          fi
+          [ "$bad" = 0 ] || exit 1
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  checks:
+    needs: verify
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    name: build and publish
+    needs: [verify, checks]
+    runs-on: macos-latest
+    permissions:
+      contents: write # create the release and upload the zip
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build the universal app
+        run: ./tools/macos/bundle.sh
+      - name: Check the zip
+        run: |
+          zip="dist/OpenGX100-Editor-$VERSION-macos.zip"
+          test -f "$zip"
+          unzip -l "$zip"
+          lipo -info "dist/OpenGX100 Editor.app/Contents/MacOS/OpenGX100 Editor" | grep -q "x86_64 arm64"
+
+      - name: Write the release notes
+        run: |
+          # checkout fetches a lightweight copy of the tag; fetch the annotated one for its message.
+          git fetch --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
+          if [ "$(git cat-file -t "$GITHUB_REF_NAME")" = tag ]; then
+            git tag -l --format='%(contents)' "$GITHUB_REF_NAME" > changes.md
+          else
+            : > changes.md
+          fi
+          python3 - <<'PY'
+          import os
+          notes = open(".github/release-notes.md").read()
+          changes = open("changes.md").read().strip()
+          notes = notes.replace("${VERSION}", os.environ["VERSION"])
+          notes = notes.replace("${CHANGES}", changes + "\n" if changes else "")
+          open("notes.md", "w").write(notes)
+          PY
+          cat notes.md
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "dist/OpenGX100-Editor-$VERSION-macos.zip" \
+            --title "OpenGX100 Editor $VERSION for macOS" \
+            --notes-file notes.md \
+            --verify-tag
