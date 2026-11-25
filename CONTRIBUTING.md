@@ -1,7 +1,9 @@
 # Contributing to OpenGX100 Editor
 
 Thanks for helping! Bug reports, hardware test reports (especially Windows and Linux), and pull requests are all
-welcome. For anything bigger than a small fix, please open an issue first so we can agree on the approach.
+welcome. For anything bigger than a small fix, and for **any change to how the interface looks or behaves**, please
+open an issue first and wait for a reply before writing code, so we can agree on the direction. That saves you from
+work that might not be merged.
 
 ## Ground rules
 
@@ -39,6 +41,11 @@ People run this against their own pedal and their own patches.
   plain Rust.
 - Format with `cargo fmt` (`max_width = 120`), keep `cargo clippy --workspace --all-targets` clean.
 - Match the style around you: small functions, comments that explain *why*.
+
+### 4. Interface
+
+The editor aims to be a coherent, simple interface: one visual language (knobs, faders, switches, the chain diagram)
+used the same way everywhere. New features should reuse those controls rather than add a new look.
 
 ## Development setup
 
