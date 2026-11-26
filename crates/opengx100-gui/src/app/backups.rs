@@ -163,7 +163,8 @@ impl EditorApp {
                     let now = self.names.get(*n as usize - 1).cloned().flatten();
                     ui.horizontal(|ui| {
                         let changed = now.as_ref().is_some_and(|now| now != name);
-                        let text = RichText::new(format!("{n:03}  {name:<16}")).monospace();
+                        let text =
+                            RichText::new(format!("{}  {name:<16}", self.settings.numbering.label(*n))).monospace();
                         ui.label(if changed { text.color(AMBER) } else { text });
                         if let (true, Some(now)) = (changed, now) {
                             ui.label(RichText::new(format!("now on the pedal: {now}")).weak());

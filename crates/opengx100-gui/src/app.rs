@@ -12,7 +12,7 @@ mod presets;
 mod setlists;
 mod tuner;
 
-use crate::store::{Backup, BackupInfo, Setlist, Settings, Store};
+use crate::store::{Backup, BackupInfo, Numbering, Setlist, Settings, Store};
 use crate::worker::{self, Cmd, Event, PatchId};
 use editing::Dialog;
 use eframe::egui::{self, pos2, vec2, Color32, Pos2, Rect, RichText, Sense, Stroke};
@@ -401,9 +401,9 @@ impl EditorApp {
                     self.auto_write_restart();
                     if self.auto_writing.take() == Some(n) {
                         let at = chrono::Local::now().format("%H:%M");
-                        self.notice = Some(format!("Patch {n:03} auto-written at {at}."));
+                        self.notice = Some(format!("Patch {} auto-written at {at}.", self.settings.numbering.label(n)));
                     } else if self.current == Some(n) || self.view == View::Patch {
-                        self.notice = Some(format!("Patch {n:03} written."));
+                        self.notice = Some(format!("Patch {} written.", self.settings.numbering.label(n)));
                     }
                 }
                 Event::ChainLimits(l) => self.chain_limits = Some(l),
@@ -527,6 +527,21 @@ impl EditorApp {
                 ui.label("Filter");
                 ui.add(egui::TextEdit::singleline(&mut self.filter).desired_width(f32::INFINITY));
             });
+            ui.horizontal(|ui| {
+                ui.label("Numbers");
+                let before = self.settings.numbering;
+                ui.selectable_value(&mut self.settings.numbering, Numbering::Sequential, "001")
+                    .on_hover_text("Running number, 001 to 200");
+                ui.selectable_value(&mut self.settings.numbering, Numbering::Bank, "U01-1")
+                    .on_hover_text("As on the pedal: bank U01 to U50, 4 patches each");
+                if self.settings.numbering != before {
+                    if let Some(store) = &self.store {
+                        if let Err(e) = store.save_settings(&self.settings) {
+                            self.last_error = Some(format!("couldn't save the settings: {e}"));
+                        }
+                    }
+                }
+            });
             let loaded = self.names.iter().filter(|n| n.is_some()).count();
             if connected && loaded < self.names.len() {
                 ui.horizontal(|ui| {
@@ -546,13 +561,14 @@ impl EditorApp {
                     filter.is_empty()
                         || self.names[n as usize - 1].as_deref().is_some_and(|s| s.to_lowercase().contains(&filter))
                         || format!("{n:03}").contains(&filter)
+                        || self.settings.numbering.label(n).to_lowercase().contains(&filter)
                 })
                 .collect();
             let row_h = ui.text_style_height(&egui::TextStyle::Body) + 4.0;
             egui::ScrollArea::vertical().auto_shrink(false).show_rows(ui, row_h, rows.len(), |ui, range| {
                 for &n in &rows[range] {
                     let name = self.names[n as usize - 1].as_deref().unwrap_or("…");
-                    let mut text = RichText::new(format!("{n:03}  {name}")).monospace();
+                    let mut text = RichText::new(format!("{}  {name}", self.settings.numbering.label(n))).monospace();
                     if self.current == Some(n) {
                         text = text.color(AMBER);
                     }
@@ -587,7 +603,7 @@ impl EditorApp {
         };
 
         ui.horizontal(|ui| {
-            let number = self.current.map(|n| format!("{n:03}  ")).unwrap_or_default();
+            let number = self.current.map(|n| format!("{}  ", self.settings.numbering.label(n))).unwrap_or_default();
             ui.heading(RichText::new(format!("{number}{}", data.name())).strong());
             ui.label(RichText::new("active on the pedal").weak());
             if self.loading.contains(&id) {

@@ -344,7 +344,7 @@ impl EditorApp {
             row.label(RichText::new("⠿").weak());
             row.label(RichText::new(format!("{:>2}.", i + 1)).weak().monospace());
             let name = if e.name.is_empty() { "…" } else { &e.name };
-            row.label(RichText::new(format!("{:03}  {name}", e.source)).monospace());
+            row.label(RichText::new(format!("{}  {name}", self.settings.numbering.label(e.source))).monospace());
             row.with_layout(egui::Layout::right_to_left(egui::Align::Center), |row| {
                 if row.small_button("✕").on_hover_text("remove from the setlist").clicked() {
                     remove = Some(i);
@@ -433,7 +433,11 @@ impl EditorApp {
                 }
                 self.touch();
             }
-            ui.label(format!("→ {:03}–{:03}", start, start as usize + sources.len() - 1));
+            ui.label(format!(
+                "→ {}–{}",
+                self.settings.numbering.label(start),
+                self.settings.numbering.label(start + sources.len() as u16 - 1)
+            ));
         });
         let moves = match librarian::plan_moves(&sources, s.target_start) {
             Ok(m) => m,
@@ -449,7 +453,7 @@ impl EditorApp {
             }
             ui.end_row();
             for (m, e) in moves.iter().zip(&s.entries) {
-                ui.label(RichText::new(format!("{:03}", m.target)).monospace());
+                ui.label(RichText::new(self.settings.numbering.label(m.target)).monospace());
                 let lost = !sources.contains(&m.target);
                 let now = RichText::new(self.name_of(m.target)).monospace();
                 ui.label(if lost { now.color(RED).strikethrough() } else { now });
@@ -457,7 +461,12 @@ impl EditorApp {
                 let becomes = RichText::new(&e.name).monospace();
                 ui.label(if unchanged { becomes.weak() } else { becomes.strong() });
                 ui.label(
-                    RichText::new(if unchanged { "unchanged".into() } else { format!("from {:03}", m.source) }).weak(),
+                    RichText::new(if unchanged {
+                        "unchanged".into()
+                    } else {
+                        format!("from {}", self.settings.numbering.label(m.source))
+                    })
+                    .weak(),
                 );
                 ui.end_row();
             }
@@ -467,14 +476,14 @@ impl EditorApp {
         let lost: Vec<String> = moves
             .iter()
             .filter(|m| !sources.contains(&m.target))
-            .map(|m| format!("{:03} {}", m.target, self.name_of(m.target)))
+            .map(|m| format!("{} {}", self.settings.numbering.label(m.target), self.name_of(m.target)))
             .collect();
         let range = s.target_start..s.target_start + moves.len() as u16;
         let doubled: Vec<String> = s
             .entries
             .iter()
             .filter(|e| !range.contains(&e.source))
-            .map(|e| format!("{:03} {}", e.source, e.name))
+            .map(|e| format!("{} {}", self.settings.numbering.label(e.source), e.name))
             .collect();
         ui.add_space(6.0);
         if !lost.is_empty() {

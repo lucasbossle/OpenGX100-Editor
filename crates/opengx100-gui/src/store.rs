@@ -293,6 +293,26 @@ fn write_atomic(path: &Path, contents: &[u8]) -> io::Result<()> {
     fs::rename(&tmp, path)
 }
 
+/// How patch numbers are shown.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum Numbering {
+    /// 001 … 200 (running number).
+    #[default]
+    Sequential,
+    /// As the pedal shows them: U01-1 … U50-4 (4 patches per bank).
+    Bank,
+}
+
+impl Numbering {
+    /// Label of user patch `n` (1-based).
+    pub fn label(self, n: u16) -> String {
+        match self {
+            Numbering::Sequential => format!("{n:03}"),
+            Numbering::Bank => format!("U{:02}-{}", (n.max(1) - 1) / 4 + 1, (n.max(1) - 1) % 4 + 1),
+        }
+    }
+}
+
 /// The app's own preferences (`settings.json`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
@@ -300,11 +320,13 @@ pub struct Settings {
     /// WRITE the live patch into the patch the pedal is on every `auto_write_minutes`, when it has changes.
     pub auto_write: bool,
     pub auto_write_minutes: u32,
+    /// How patch numbers are labelled in lists and headers.
+    pub numbering: Numbering,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { auto_write: false, auto_write_minutes: 5 }
+        Settings { auto_write: false, auto_write_minutes: 5, numbering: Numbering::default() }
     }
 }
 
@@ -640,12 +662,12 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let store = Store::at(dir.path().to_path_buf()).unwrap();
         assert_eq!(store.load_settings(), Settings::default());
-        let s = Settings { auto_write: true, auto_write_minutes: 12 };
+        let s = Settings { auto_write: true, auto_write_minutes: 12, ..Settings::default() };
         store.save_settings(&s).unwrap();
         assert_eq!(store.load_settings(), s);
         // missing fields take their defaults
         fs::write(dir.path().join("settings.json"), "{\"auto_write\": true}").unwrap();
-        assert_eq!(store.load_settings(), Settings { auto_write: true, auto_write_minutes: 5 });
+        assert_eq!(store.load_settings(), Settings { auto_write: true, auto_write_minutes: 5, ..Settings::default() });
     }
 
     #[test]
