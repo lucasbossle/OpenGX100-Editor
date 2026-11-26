@@ -1,5 +1,7 @@
 # OpenGX100 Editor
 
+[![CI](https://github.com/lucasbossle/OpenGX100-Editor/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/lucasbossle/OpenGX100-Editor/actions/workflows/ci.yml)
+
 An independent, open-source editor for the **BOSS GX-100** guitar effects processor, written in Rust. It talks to the
 pedal over USB MIDI, edits patches live, and adds things the official editor doesn't have: setlists, gear-style
 controls with EQ graphs, and presets for single effect blocks.

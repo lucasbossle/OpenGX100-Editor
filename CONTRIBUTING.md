@@ -53,7 +53,7 @@ You need Rust 1.95+ and BOSS TONE STUDIO for GX-100 installed (the app and CLI r
 `crates/opengx100-extract`). Node.js 18+ is only needed for the development tools in `tools/extract/`.
 
 ```sh
-cargo test                              # synthetic fixture tables (what CI would use)
+cargo test                              # synthetic fixture tables (what CI uses)
 node tools/extract/extract.mjs          # real tables → extracted/tables.json (+ intermediate JSON to inspect)
 OPENGX100_TABLES=$PWD/extracted/tables.json cargo test --workspace     # the same tests on the real tables
 cargo clippy --workspace --all-targets
